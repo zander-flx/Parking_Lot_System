@@ -4,6 +4,7 @@ COLLATE utf8mb4_unicode_ci;
 
 USE parking_lot_system;
 
+DROP TABLE IF EXISTS assignments;
 DROP TABLE IF EXISTS parking_lots;
 
 CREATE TABLE parking_lots (
@@ -15,6 +16,19 @@ CREATE TABLE parking_lots (
     price_per_hour DECIMAL(8,2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE assignments (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    parking_lot_id INT UNSIGNED NOT NULL,
+    driver_name VARCHAR(100) NOT NULL,
+    vehicle_plate VARCHAR(20) NOT NULL,
+    entry_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_assignment_lot
+        FOREIGN KEY (parking_lot_id)
+        REFERENCES parking_lots(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO parking_lots (name, location, total_spaces, available_spaces, price_per_hour) VALUES
