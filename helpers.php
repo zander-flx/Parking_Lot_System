@@ -18,23 +18,29 @@ function page(string $title, string $body): void {
         ? '<a href="login.php">Login</a>'
         : '<a href="logout.php">Logout (' . e(($_SESSION['username'] ?? 'user') . ' - ' . ($_SESSION['role'] ?? 'user')) . ')</a>';
 
-    $adminLink = '';
-
-    if (($_SESSION['role'] ?? '') === 'admin') {
-        $adminLink = ' · <a href="users.php">Users</a>';
-    }
+    $isAdmin = (($_SESSION['role'] ?? '') === 'admin');
 
     echo '<!doctype html><html lang="en"><meta charset="utf-8">';
     echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<link rel="stylesheet" href="style.css"><title>'.e($title).'</title>';
     echo '<main><nav>';
-    echo '<a href="index.php">Parking Lots</a> · ';
-    echo '<a href="create.php">Add parking lot</a> · ';
-    echo '<a href="assign.php">Assign Driver</a> · ';
-    echo '<a href="drivers.php">Assigned Drivers</a> · ';
-    echo '<a href="bill.php">Billing</a>';
-    echo $adminLink;
+
+    echo '<a href="index.php">Parking Lots</a>';
+
+    if ($isAdmin) {
+        echo ' · <a href="create.php">Add parking lot</a>';
+    }
+
+    echo ' · <a href="assign.php">Assign Driver</a>';
+    echo ' · <a href="drivers.php">Assigned Drivers</a>';
+    echo ' · <a href="bill.php">Billing</a>';
+
+    if ($isAdmin) {
+        echo ' · <a href="users.php">Users</a>';
+    }
+
     echo ' · ' . $authLink;
+
     echo '</nav>';
     echo '<h1>'.e($title).'</h1>'.$body.'</main></html>';
 }

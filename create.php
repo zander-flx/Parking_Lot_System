@@ -1,6 +1,18 @@
 <?php
 require 'config.php';
 require 'helpers.php';
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+if (($_SESSION['role'] ?? '') !== 'admin') {
+    http_response_code(403);
+    page('Forbidden', '<p>Admin access required.</p>');
+    exit;
+}
+
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim((string)($_POST['name'] ?? ''));

@@ -4,6 +4,7 @@ COLLATE utf8mb4_unicode_ci;
 
 USE parking_lot_system;
 
+
 DROP TABLE IF EXISTS assignments;
 DROP TABLE IF EXISTS parking_lots;
 
@@ -30,6 +31,17 @@ CREATE TABLE assignments (
         ON DELETE CASCADE
         ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(64) NOT NULL,
+    role ENUM('admin','user') NOT NULL DEFAULT 'user'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO users (username, password_hash, role) VALUES
+('admin', SHA2('admin123', 256), 'admin'),
+('user', SHA2('user123', 256), 'user');
 
 INSERT INTO parking_lots (name, location, total_spaces, available_spaces, price_per_hour) VALUES
 ('Downtown Plaza Garage', '123 Main Street', 250, 42, 3.50),

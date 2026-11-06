@@ -1,6 +1,12 @@
 <?php
 require 'config.php';
 require 'helpers.php';
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 $search = trim((string)($_GET['q'] ?? ''));
 $sql = 'SELECT id, name, location, total_spaces, available_spaces, price_per_hour
         FROM parking_lots';

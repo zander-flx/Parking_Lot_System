@@ -1,5 +1,11 @@
 <?php
 require 'config.php'; require 'helpers.php';
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 $error = '';
 $lots = $pdo->query('SELECT id, name, available_spaces FROM parking_lots WHERE available_spaces > 0 ORDER BY name')->fetchAll();
 
