@@ -1,14 +1,6 @@
 <?php
-require 'helpers.php';
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$_SESSION = [];
-
-session_destroy();
-
-header('Location: login.php');
-exit;
-?>
+require 'helpers.php';        // starts the session; no database needed
+$_SESSION = [];               // drop all sign-in keys
+session_regenerate_id(true);
+setFlash('ok', 'You have been signed out.');
+header('Location: login.php'); exit;

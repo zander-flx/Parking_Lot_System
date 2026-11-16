@@ -1,43 +1,34 @@
 <?php
 require 'config.php';
 require 'helpers.php';
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    http_response_code(403);
-    page('Forbidden', '<p>Admin access required.</p>');
-    exit;
-}
-
-$error = '';
+requireAdmin();
+$types = $pdo->query('SELECT type_id, type_name, hourly_rate FROM space_types ORDER BY type_id')->fetchAll();
+$error = ''; $code = ''; $type = 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim((string)($_POST['name'] ?? ''));
-    $location = trim((string)($_POST['location'] ?? ''));
-    $total = filter_var($_POST['total_spaces'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>0]]);
-    $available = filter_var($_POST['available_spaces'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>0]]);
-    $price = filter_var($_POST['price_per_hour'] ?? null, FILTER_VALIDATE_FLOAT, ['options'=>['min_range'=>0]]);
-    if ($name === '' || strlen($name)>100 || $location === '' || strlen($location)>150 || $total===false || $available===false || $price===false || $available > $total) {
-        $error = 'Check required fields. Available spaces cannot exceed total spaces.';
+    $code = strtoupper(trim((string)($_POST['space_code'] ?? '')));
+    $type = positiveId($_POST['type_id'] ?? null);
+    $validType = in_array($type, array_map(fn($t) => (int)$t['type_id'], $types), true);
+    if ($code === '' || strlen($code) > 10 || !$validType) {
+        $error = 'Give a space code (max 10 characters) and choose a type.';
     } else {
         try {
-            $stmt=$pdo->prepare('INSERT INTO parking_lots (name,location,total_spaces,available_spaces,price_per_hour) VALUES (?,?,?,?,?)');
-            $stmt->execute([$name,$location,$total,$available,$price]);
+            $stmt = $pdo->prepare('INSERT INTO spaces (space_code, type_id) VALUES (?,?)');
+            $stmt->execute([$code, $type]);
+            setFlash('ok', "Space $code added.");
             header('Location: index.php'); exit;
-        } catch(PDOException $ex) { $error='Unable to save parking lot.'; }
+        } catch (PDOException $ex) { $error = "Unable to save: space code \"$code\" may already exist."; }
     }
 }
 ob_start(); ?>
-<?php if ($error): ?><p class="error"><?= e($error) ?></p><?php endif; ?>
-<form method="post">
-<label>Name <input name="name" maxlength="100" required></label>
-<label>Location <input name="location" maxlength="150" required></label>
-<label>Total Spaces <input type="number" name="total_spaces" min="0" required></label>
-<label>Available Spaces <input type="number" name="available_spaces" min="0" required></label>
-<label>Price per Hour <input type="number" name="price_per_hour" min="0" step="0.01" required></label>
-<button>Save parking lot</button>
+<?php if ($error): ?><p class="alert alert-error"><?= e($error) ?></p><?php endif; ?>
+<form method="post" class="card form">
+<label>Space code <input name="space_code" class="upper" maxlength="10" required placeholder="e.g. A-05" value="<?= e($code) ?>"></label>
+<label>Type &amp; rate <select name="type_id" required>
+<option value="">Choose a type…</option>
+<?php foreach ($types as $t): ?>
+<option value="<?= (int)$t['type_id'] ?>" <?= $type === (int)$t['type_id'] ? 'selected' : '' ?>><?= e($t['type_name']) ?> — <?= money($t['hourly_rate']) ?>/hr</option>
+<?php endforeach; ?>
+</select><small class="hint">The rate is locked into each ticket at check-in, so future price changes never affect open tickets.</small></label>
+<div class="btn-row"><button class="btn">Save space</button><a class="btn ghost" href="index.php">Cancel</a></div>
 </form>
-<?php page('Add Parking Lot',ob_get_clean());?>
+<?php page('Add Parking Space', ob_get_clean());

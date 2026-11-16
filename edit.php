@@ -1,35 +1,40 @@
 <?php
 require 'config.php'; require 'helpers.php';
-$id=positiveId($_GET['id'] ?? null);
-$stmt=$pdo->prepare('SELECT * FROM parking_lots WHERE id=?');
-$stmt->execute([$id]); $lot=$stmt->fetch();
-if (!$lot) { http_response_code(404); exit('Parking lot not found.'); }
-$error='';
-if ($_SERVER['REQUEST_METHOD']==='POST') {
-    $name=trim((string)($_POST['name'] ?? ''));
-    $location=trim((string)($_POST['location'] ?? ''));
-    $total=filter_var($_POST['total_spaces'] ?? null,FILTER_VALIDATE_INT,['options'=>['min_range'=>0]]);
-    $available=filter_var($_POST['available_spaces'] ?? null,FILTER_VALIDATE_INT,['options'=>['min_range'=>0]]);
-    $price=filter_var($_POST['price_per_hour'] ?? null,FILTER_VALIDATE_FLOAT,['options'=>['min_range'=>0]]);
-    if ($name==='' || strlen($name)>100 || $location==='' || strlen($location)>150 || $total===false || $available===false || $price===false || $available > $total) {
-        $error='Please correct the fields. Available spaces cannot exceed total.';
+requireAdmin();
+$id = positiveId($_GET['id'] ?? null);
+$stmt = $pdo->prepare('SELECT * FROM spaces WHERE space_id = ?');
+$stmt->execute([$id]); $space = $stmt->fetch();
+if (!$space) { http_response_code(404); exit('Parking space not found.'); }
+$types = $pdo->query('SELECT type_id, type_name, hourly_rate FROM space_types ORDER BY type_id')->fetchAll();
+$stmt = $pdo->prepare('SELECT ps.rate, d.plate_number FROM sessions ps JOIN drivers d ON d.driver_id = ps.driver_id
+                       WHERE ps.space_id = ? AND ps.time_out IS NULL');
+$stmt->execute([$id]); $occupied = $stmt->fetch();
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $code = strtoupper(trim((string)($_POST['space_code'] ?? '')));
+    $type = positiveId($_POST['type_id'] ?? null);
+    $validType = in_array($type, array_map(fn($t) => (int)$t['type_id'], $types), true);
+    if ($code === '' || strlen($code) > 10 || !$validType) {
+        $error = 'Please correct the fields.';
     } else {
         try {
-            $update=$pdo->prepare('UPDATE parking_lots SET name=?,location=?,total_spaces=?,available_spaces=?,price_per_hour=? WHERE id=?');
-            $update->execute([$name,$location,$total,$available,$price,$id]);
+            $pdo->prepare('UPDATE spaces SET space_code = ?, type_id = ? WHERE space_id = ?')->execute([$code, $type, $id]);
+            setFlash('ok', "Space $code updated.");
             header('Location: index.php'); exit;
-        } catch(PDOException $ex) { $error='Could not save changes.'; }
+        } catch (PDOException $ex) { $error = 'Could not save changes; the space code may already exist.'; }
     }
-    $lot=['name'=>$name,'location'=>$location,'total_spaces'=>$total,'available_spaces'=>$available,'price_per_hour'=>$price];
+    $space = array_merge($space, ['space_code' => $code, 'type_id' => $type]);
 }
 ob_start(); ?>
-<?php if($error): ?><p class="error"><?= e($error) ?></p><?php endif; ?>
-<form method="post">
-<label>Name <input name="name" maxlength="100" required value="<?= e($lot['name']) ?>"></label>
-<label>Location <input name="location" maxlength="150" required value="<?= e($lot['location']) ?>"></label>
-<label>Total Spaces <input type="number" name="total_spaces" min="0" required value="<?= (int)$lot['total_spaces'] ?>"></label>
-<label>Available Spaces <input type="number" name="available_spaces" min="0" required value="<?= (int)$lot['available_spaces'] ?>"></label>
-<label>Price per Hour <input type="number" name="price_per_hour" min="0" step="0.01" required value="<?= e(number_format((float)$lot['price_per_hour'], 2)) ?>"></label>
-<button>Update</button>
+<?php if ($error): ?><p class="alert alert-error"><?= e($error) ?></p><?php endif; ?>
+<?php if ($occupied): ?><p class="alert alert-info">🚗 <?= e($occupied['plate_number']) ?> is parked here. Its open ticket keeps the original rate (<?= money($occupied['rate']) ?>/hr) even if you change this space's type.</p><?php endif; ?>
+<form method="post" class="card form">
+<label>Space code <input name="space_code" class="upper" maxlength="10" required value="<?= e($space['space_code']) ?>"></label>
+<label>Type &amp; rate <select name="type_id" required>
+<?php foreach ($types as $t): ?>
+<option value="<?= (int)$t['type_id'] ?>" <?= (int)$space['type_id'] === (int)$t['type_id'] ? 'selected' : '' ?>><?= e($t['type_name']) ?> — <?= money($t['hourly_rate']) ?>/hr</option>
+<?php endforeach; ?>
+</select></label>
+<div class="btn-row"><button class="btn">Update space</button><a class="btn ghost" href="index.php">Cancel</a></div>
 </form>
-<?php page('Edit Parking Lot',ob_get_clean());?>
+<?php page('Edit Parking Space', ob_get_clean());

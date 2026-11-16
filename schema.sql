@@ -1,49 +1,70 @@
-CREATE DATABASE IF NOT EXISTS parking_lot_system
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS parking_lot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE parking_lot;
 
-USE parking_lot_system;
+CREATE TABLE IF NOT EXISTS space_types (
+  type_id INT AUTO_INCREMENT PRIMARY KEY,
+  type_name VARCHAR(50) NOT NULL UNIQUE,
+  hourly_rate DECIMAL(10,2) NOT NULL
+);
 
+CREATE TABLE IF NOT EXISTS spaces (
+  space_id INT AUTO_INCREMENT PRIMARY KEY,
+  type_id INT NOT NULL,
+  space_code VARCHAR(10) NOT NULL UNIQUE,
+  FOREIGN KEY (type_id) REFERENCES space_types(type_id)
+);
 
-DROP TABLE IF EXISTS assignments;
-DROP TABLE IF EXISTS parking_lots;
+CREATE TABLE IF NOT EXISTS drivers (
+  driver_id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(120) NOT NULL,
+  plate_number VARCHAR(20) NOT NULL UNIQUE,
+  phone VARCHAR(20) NOT NULL DEFAULT ''
+);
 
-CREATE TABLE parking_lots (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    location VARCHAR(150) NOT NULL,
-    total_spaces INT UNSIGNED NOT NULL DEFAULT 0,
-    available_spaces INT UNSIGNED NOT NULL DEFAULT 0,
-    price_per_hour DECIMAL(8,2) NOT NULL DEFAULT 0.00,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id INT AUTO_INCREMENT PRIMARY KEY,
+  space_id INT NOT NULL,
+  driver_id INT NOT NULL,
+  time_in DATETIME NOT NULL,
+  time_out DATETIME NULL,
+  rate DECIMAL(10,2) NOT NULL,            -- rate locked in at check-in
+  amount_due DECIMAL(10,2) NULL,
+  tendered DECIMAL(10,2) NULL,
+  amount_paid DECIMAL(10,2) NULL,
+  payment_method VARCHAR(20) NULL,
+  paid_at DATETIME NULL,
+  KEY idx_space_active (space_id, time_out),
+  FOREIGN KEY (space_id) REFERENCES spaces(space_id),
+  FOREIGN KEY (driver_id) REFERENCES drivers(driver_id)
+);
 
-CREATE TABLE assignments (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    parking_lot_id INT UNSIGNED NOT NULL,
-    driver_name VARCHAR(100) NOT NULL,
-    vehicle_plate VARCHAR(20) NOT NULL,
-    entry_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_assignment_lot
-        FOREIGN KEY (parking_lot_id)
-        REFERENCES parking_lots(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO space_types (type_id,type_name,hourly_rate) VALUES
+ (1,'Motorcycle',25.00),(2,'Compact',40.00),(3,'Standard',50.00),(4,'SUV / Van',65.00);
+
+INSERT IGNORE INTO spaces (space_id,type_id,space_code) VALUES
+ (1,2,'A-01'),(2,2,'A-02'),(3,3,'A-03'),(4,3,'A-04'),
+ (5,4,'B-01'),(6,4,'B-02'),(7,1,'M-01'),(8,1,'M-02');
+
+INSERT IGNORE INTO drivers (driver_id,full_name,plate_number,phone) VALUES
+ (1,'Juan Dela Cruz','ABC123','0917 123 4567'),
+ (2,'Maria Santos','XYZ987','0928 555 0199');
+
+-- Demo: one car parked 2h15m ago, one finished & paid ticket.
+INSERT IGNORE INTO sessions
+ (session_id,space_id,driver_id,time_in,time_out,rate,amount_due,tendered,amount_paid,payment_method,paid_at) VALUES
+ (1,2,1,NOW() - INTERVAL 135 MINUTE,NULL,40.00,NULL,NULL,NULL,NULL,NULL),
+ (2,3,2,NOW() - INTERVAL 5 HOUR,NOW() - INTERVAL 3 HOUR,50.00,100.00,200.00,100.00,'Cash',NOW() - INTERVAL 3 HOUR);
 
 CREATE TABLE IF NOT EXISTS users (
-    user_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(64) NOT NULL,
-    role ENUM('admin','user') NOT NULL DEFAULT 'user'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  user_id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(30) NOT NULL UNIQUE,
+  full_name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('admin','user') NOT NULL DEFAULT 'user',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-INSERT IGNORE INTO users (username, password_hash, role) VALUES
-('admin', SHA2('admin123', 256), 'admin'),
-('user', SHA2('user123', 256), 'user');
-
-INSERT INTO parking_lots (name, location, total_spaces, available_spaces, price_per_hour) VALUES
-('Downtown Plaza Garage', '123 Main Street', 250, 42, 3.50),
-('Airport Long Stay', '456 Airport Road', 600, 180, 2.25),
-('Central Mall Parking', '789 Central Avenue', 320, 0, 1.75);
+-- Demo logins: admin / admin123 and staff / user123 (real bcrypt cost-10 hashes)
+INSERT IGNORE INTO users (user_id, username, full_name, password_hash, role) VALUES
+ (1,'admin','Lot Administrator','$2y$10$7Yncbp8b70mPWiSUOQf/IOyY32u4zdI9AG5GpoSZL6PElCgHk2daG','admin'),
+ (2,'staff','Parking Staff','$2y$10$r4.JPrappuDxJmQfJdj4bOyOdpvlAvaWwBUq/i3HN.sxK6gnZhC9q','user');
